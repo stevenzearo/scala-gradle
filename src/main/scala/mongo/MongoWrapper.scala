@@ -58,6 +58,14 @@ class DateTimeMongoWrapper(timeFormattedPattern: String) extends RefMongoWrapper
     }
 }
 
+class TimeStampMongoWrapper(timeFormattedPattern: String) extends RefMongoWrapper {
+    override def get(bson: BsonDocument)(key: String): String = {
+        val value = bson.getTimestamp(key).getValue
+        val format = new SimpleDateFormat(timeFormattedPattern)
+        format.format(value)
+    }
+}
+
 class ArrayMongoWrapper extends RefMongoWrapper {
     override def get(bson: BsonDocument)(key: String): BsonArray = {
         bson.getArray(key)
