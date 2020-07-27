@@ -1,9 +1,5 @@
 package stopwatch
 
-import java.time.ZonedDateTime
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
-
 /**
  * @author steve
  */
