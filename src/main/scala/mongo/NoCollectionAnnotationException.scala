@@ -3,7 +3,7 @@ package mongo
 /**
  * @author steve
  */
-class TimeOutException extends Exception {
+class NoCollectionAnnotationException extends Exception {
     private var msg: String = _
 
     def this(msg: String) {
