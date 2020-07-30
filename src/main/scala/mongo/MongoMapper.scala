@@ -2,6 +2,7 @@ package mongo
 
 import java.lang.reflect.Field
 
+import mongo.exception.{NoCollectionAnnotationException, NoFieldAnnotationException, TypeMismatchException}
 import org.bson.BsonType
 import org.mongodb.scala.bson.BsonDocument
 
@@ -29,32 +30,42 @@ object MongoMapper {
     def setFieldValue[T](key: String, bsonType: BsonType, bsonDocument: BsonDocument, field: Field, t: T): Unit = {
         bsonType match {
             case BsonType.INT32 => {
-
+                checkClassType(field, classOf[Int])
                 field.set(t, MongoWrapper.intWrapper.get(bsonDocument, key))
             }
             case BsonType.INT64 => {
-                LongMongoWrapper.get(bsonDocument, key)
+                checkClassType(field, classOf[Long])
+                field.set(t, MongoWrapper.longWrapper.get(bsonDocument, key))
             }
             case BsonType.BOOLEAN => {
-                BooleanMongoWrapper.get(bsonDocument, key)
+                checkClassType(field, classOf[Boolean])
+                field.set(t, MongoWrapper.booleanWrapper.get(bsonDocument, key))
             }
             case BsonType.DOUBLE => {
-
+                checkClassType(field, classOf[Double])
+                field.set(t, MongoWrapper.doubleWrapper.get(bsonDocument, key))
             }
             case BsonType.DATE_TIME => {
-
+                checkClassType(field, classOf[Long])
+                field.set(t, MongoWrapper.dateTimeWrapper.get(bsonDocument, key))
             }
             case BsonType.TIMESTAMP => {
-
+                checkClassType(field, classOf[Long])
+                field.set(t, MongoWrapper.timeStampWrapper.get(bsonDocument, key))
             }
             case BsonType.STRING => {
-
+                checkClassType(field, classOf[String])
+                field.set(t, MongoWrapper.stringWrapper.get(bsonDocument, key))
             }
             case BsonType.ARRAY => {
                 // todo
+                checkClassType(field, classOf[Seq[_]])
+                val bsonArray = MongoWrapper.arrayMapper.get(bsonDocument, key)
             }
             case BsonType.DOCUMENT => {
                 // todo
+                checkClassType(field, classOf[Object])
+                field.set(t, MongoWrapper.documentMapper.get(bsonDocument, key))
             }
             case _ => {
 
@@ -63,6 +74,6 @@ object MongoMapper {
     }
 
     def checkClassType[T](field: Field, clazz: Class[T]): Unit = {
-        if (!field.getDeclaringClass.isInstanceOf[Class[T]]) throw new TypeMismatchException(s"filed type mismatch with ${clazz.getName}")
+        if (!field.getDeclaringClass.isInstance(clazz)) throw new TypeMismatchException(s"filed type mismatch with ${clazz.getName}")
     }
 }

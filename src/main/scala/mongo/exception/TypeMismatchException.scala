@@ -1,9 +1,9 @@
-package mongo
+package mongo.exception
 
 /**
  * @author steve
  */
-class MongoQueryException extends Exception {
+class TypeMismatchException extends Exception {
     private var msg: String = _
 
     def this(msg: String) {

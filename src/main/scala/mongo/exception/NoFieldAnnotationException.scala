@@ -1,9 +1,9 @@
-package mongo
+package mongo.exception
 
 /**
  * @author steve
  */
-class NoCollectionAnnotationException extends Exception {
+class NoFieldAnnotationException extends Exception {
     private var msg: String = _
 
     def this(msg: String) {
