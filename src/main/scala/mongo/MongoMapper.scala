@@ -4,7 +4,7 @@ import java.lang.reflect.Field
 
 import mongo.exception.{NoCollectionAnnotationException, NoFieldAnnotationException, TypeMismatchException}
 import org.bson.BsonType
-import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.{BsonArray, BsonDocument}
 
 /**
  * @author steve
@@ -16,18 +16,36 @@ object MongoMapper {
         if (collectionAnnotation == null) throw new NoCollectionAnnotationException("mongo collection domain must has @Collection annotation")
         val constructor = clazz.getDeclaredConstructor()
         val t = constructor.newInstance()
-        clazz.getDeclaredFields.foreach(field => {
-            val FieldAnnotation = field.getDeclaredAnnotation(classOf[MongoField])
-            if (field == null) throw new NoFieldAnnotationException("filed must has @Field annotation")
-            val bsonType = FieldAnnotation.mongoType()
 
-            bsonType
-        })
+
         clazz
         //        new T
     }
 
-    def setFieldValue[T](key: String, bsonType: BsonType, bsonDocument: BsonDocument, field: Field, t: T): Unit = {
+    def setFieldValue(t: Object, clazz: Class[_], document: BsonDocument): Unit = {
+        val fieldClassMongoField = clazz.getDeclaredAnnotation(classOf[MongoField])
+        if (fieldClassMongoField == null) {
+            clazz.getDeclaredFields.foreach(field => {
+                val mongoField = field.getDeclaredAnnotation(classOf[MongoField])
+                if (mongoField == null) throw new NoFieldAnnotationException("mongo field must has @MongoField annotation")
+                val mongoWrapperOption = MongoWrapper.mongoTypeMap.get(fieldClassMongoField.mongoType())
+                if (mongoWrapperOption.isEmpty) throw new UnknownBsonTypeException(s"Unknown bson type ${fieldClassMongoField.mongoType().name()}")
+                val mongoWrapper = mongoWrapperOption.get
+                val value = mongoWrapper.get(document, fieldClassMongoField.name())
+                if (mongoField.mongoType() == BsonType.DOCUMENT) {
+                    setFieldValue(field, field.getClass, value.asInstanceOf[BsonDocument])
+                } else if (mongoField.mongoType() == BsonType.ARRAY) {
+                    val bsonArray = value.asInstanceOf[BsonArray]
+
+                }
+            })
+
+        } else {
+
+        }
+    }
+
+    def mapFieldValue[T](key: String, bsonType: BsonType, bsonDocument: BsonDocument, field: Field, t: T): Unit = {
         bsonType match {
             case BsonType.INT32 => {
                 checkClassType(field, classOf[Int])
