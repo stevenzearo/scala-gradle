@@ -13,7 +13,7 @@ object MongoMapper {
     def map[T](document: BsonDocument, clazz: Class[T]): Unit = {
 
         val collectionAnnotation = clazz.getDeclaredAnnotation(classOf[Collection])
-        if (collectionAnnotation == null) throw new NoCollectionAnnotationException("mongo collection domain must has @Collection annotation")
+        if (collectionAnnotation == null) throw new NoCollectionAnnotationException(s"mongo collection domain must has ${classOf[Collection].getName} annotation")
         val constructor = clazz.getDeclaredConstructor()
         val t = constructor.newInstance()
 
@@ -27,7 +27,7 @@ object MongoMapper {
         if (fieldClassMongoField == null) {
             clazz.getDeclaredFields.foreach(field => {
                 val mongoField = field.getDeclaredAnnotation(classOf[MongoField])
-                if (mongoField == null) throw new NoFieldAnnotationException("mongo field must has @MongoField annotation")
+                if (mongoField == null) throw new NoFieldAnnotationException(s"mongo field must has ${classOf[MongoField].getName} annotation")
                 val mongoWrapperOption = MongoWrapper.mongoTypeMap.get(fieldClassMongoField.mongoType())
                 if (mongoWrapperOption.isEmpty) throw new UnknownBsonTypeException(s"Unknown bson type ${fieldClassMongoField.mongoType().name()}")
                 val mongoWrapper = mongoWrapperOption.get
