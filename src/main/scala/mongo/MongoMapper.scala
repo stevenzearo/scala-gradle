@@ -2,9 +2,9 @@ package mongo
 
 import java.lang.reflect.Field
 
-import mongo.exception.{NoCollectionAnnotationException, NoFieldAnnotationException, TypeMismatchException}
+import mongo.exception.{NoCollectionAnnotationException, NoFieldAnnotationException, TypeMismatchException, UnsupportedMongoStructureException}
 import org.bson.BsonType
-import org.mongodb.scala.bson.{BsonArray, BsonDocument}
+import org.mongodb.scala.bson.{BsonArray, BsonDocument, BsonValue}
 
 /**
  * @author steve
@@ -22,6 +22,19 @@ object MongoMapper {
         //        new T
     }
 
+    /*
+    * class A {
+    * @MongoField
+    *  field 1 (basic type)
+    *
+    * @MongoField
+    * field 2 (array)
+    *
+    * @MongoField
+    * field 3 (class)
+    *
+    * }
+    * */
     def setFieldValue(t: Object, clazz: Class[_], document: BsonDocument): Unit = {
         val fieldClassMongoField = clazz.getDeclaredAnnotation(classOf[MongoField])
         if (fieldClassMongoField == null) {
@@ -36,7 +49,9 @@ object MongoMapper {
                     setFieldValue(field, field.getClass, value.asInstanceOf[BsonDocument])
                 } else if (mongoField.mongoType() == BsonType.ARRAY) {
                     val bsonArray = value.asInstanceOf[BsonArray]
-
+                    setFieldValueForArray(t, field, bsonArray)
+                } else {
+                    field.set(t, value)
                 }
             })
 
@@ -45,53 +60,47 @@ object MongoMapper {
         }
     }
 
-    def mapFieldValue[T](key: String, bsonType: BsonType, bsonDocument: BsonDocument, field: Field, t: T): Unit = {
-        bsonType match {
-            case BsonType.INT32 => {
-                checkClassType(field, classOf[Int])
-                field.set(t, MongoWrapper.intWrapper.get(bsonDocument, key))
-            }
-            case BsonType.INT64 => {
-                checkClassType(field, classOf[Long])
-                field.set(t, MongoWrapper.longWrapper.get(bsonDocument, key))
-            }
-            case BsonType.BOOLEAN => {
-                checkClassType(field, classOf[Boolean])
-                field.set(t, MongoWrapper.booleanWrapper.get(bsonDocument, key))
-            }
-            case BsonType.DOUBLE => {
-                checkClassType(field, classOf[Double])
-                field.set(t, MongoWrapper.doubleWrapper.get(bsonDocument, key))
-            }
-            case BsonType.DATE_TIME => {
-                checkClassType(field, classOf[Long])
-                field.set(t, MongoWrapper.dateTimeWrapper.get(bsonDocument, key))
-            }
-            case BsonType.TIMESTAMP => {
-                checkClassType(field, classOf[Long])
-                field.set(t, MongoWrapper.timeStampWrapper.get(bsonDocument, key))
-            }
-            case BsonType.STRING => {
-                checkClassType(field, classOf[String])
-                field.set(t, MongoWrapper.stringWrapper.get(bsonDocument, key))
-            }
-            case BsonType.ARRAY => {
-                // todo
-                checkClassType(field, classOf[Seq[_]])
-                val bsonArray = MongoWrapper.arrayMapper.get(bsonDocument, key)
-            }
-            case BsonType.DOCUMENT => {
-                // todo
-                checkClassType(field, classOf[Object])
-                field.set(t, MongoWrapper.documentMapper.get(bsonDocument, key))
-            }
-            case _ => {
+    def setFieldValueForArray(t: Object, field: Field, bsonArray: BsonArray): Unit = {
+        // todo check type
+        if (bsonArray.isEmpty) field.set(t, Array())
+        val bsonValues = bsonArray.getValues
+        val elemBsonType = bsonValues.get(0).getBsonType
+        if (elemBsonType == BsonType.ARRAY) {
+            throw new UnsupportedMongoStructureException("Unsupported mongo structure, while a BsonArray in a BsonArray")
 
-            }
+        } else if (elemBsonType == BsonType.DOCUMENT) {
+            val mongoWrapperOption = MongoWrapper.mongoTypeMap.get(elemBsonType)
+            if (mongoWrapperOption.isEmpty) throw new UnknownBsonTypeException(s"Unknown bson type ${elemBsonType.name()}")
+            // todo get field class -> new instance -> set value
+            val fieldElemClass = field.getType.getGenericSuperclass.getClass
+            val fieldValue = bsonValues.stream().map(bsonValue => {
+                val fieldElemUnWrappedValue: Object = fieldElemClass.getDeclaredConstructor().newInstance().asInstanceOf[Object]
+                setFieldValue(fieldElemUnWrappedValue, fieldElemClass, bsonValue.asDocument())
+            }).toArray
+            field.set(fieldValue, t)
+        } else {
+            val scalaArray = bsonArray.stream().map(bsonValue => bsonToScalaVal(bsonValue)).toArray()
+            field.set(t, scalaArray)
         }
     }
 
-    def checkClassType[T](field: Field, clazz: Class[T]): Unit = {
+    def bsonToScalaVal(bsonValue: BsonValue): Any = {
+        val bsonType = bsonValue.getBsonType
+        bsonType match {
+            case BsonType.INT32 => bsonValue.asInt32().getValue
+            case BsonType.INT64 => bsonValue.asInt64().getValue
+            case BsonType.BOOLEAN => bsonValue.asBoolean().getValue
+            case BsonType.DOUBLE => bsonValue.asDouble().getValue
+            case BsonType.STRING => bsonValue.asString().getValue
+            case BsonType.DATE_TIME => bsonValue.asDateTime().getValue
+            case BsonType.TIMESTAMP => bsonValue.asTimestamp().getValue
+            case BsonType.BINARY => bsonValue.asBinary().getData
+            case BsonType.ARRAY => bsonValue.asArray().stream().map(bsonVal => bsonToScalaVal(bsonVal)).toArray()
+            case _ => throw new TypeMismatchException(s"invalid bson type ${bsonType.name()}")
+        }
+    }
+
+    def checkBasicClassType[T](field: Field, clazz: Class[T]): Unit = {
         if (!field.getDeclaringClass.isInstance(clazz)) throw new TypeMismatchException(s"filed type mismatch with ${clazz.getName}")
     }
 }

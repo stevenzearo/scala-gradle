@@ -1,7 +1,5 @@
 package stopwatch
 
-import mongo.MongoDemo
-
 /**
  * @author steve
  */
